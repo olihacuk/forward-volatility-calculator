@@ -1,112 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stock Screener</title>
-  <style>
-    body {
-      background: #f3f4f6;
-      font-family: Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .container {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      padding: 30px;
-      width: 360px;
-    }
-    h1 {
-      text-align: center;
-      font-size: 1.5rem;
-      color: #111827;
-    }
-    input {
-      width: 100%;
-      font-size: 1.2rem;
-      margin-top: 10px;
-      padding: 10px;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-    }
-    button {
-      width: 100%;
-      background-color: #3b82f6;
-      color: white;
-      font-size: 1.1rem;
-      border: none;
-      border-radius: 8px;
-      padding: 10px;
-      margin-top: 12px;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-    button:hover {
-      background-color: #2563eb;
-    }
-    .results {
-      margin-top: 20px;
-      font-size: 1rem;
-      line-height: 1.6;
-    }
-    .error {
-      color: red;
-      font-weight: bold;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Forward Volatility Calculator</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; background: #fafafa; color: #222; }
+  h1 { font-size: 1.6rem; }
+  label { display: inline-block; width: 90px; margin-right: 8px; }
+  input { width: 100px; padding: 4px; margin: 4px; }
+  button { padding: 6px 12px; margin-right: 6px; cursor: pointer; }
+  fieldset { margin-top: 1.2rem; padding: 1rem; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
+  .outputs p { margin: 0.2rem 0; }
+  .note { font-size: 0.9rem; color: #555; margin-top: 1rem; max-width: 700px; }
+  .error { color: #b00; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Stock Screener</h1>
-    <input id="ticker" type="text" placeholder="Enter ticker symbol (e.g. AAPL)" />
-    <button onclick="getData()">Get Data</button>
-    <div class="results" id="results"></div>
+<h1>Forward Volatility Calculator</h1>
+
+<p><strong>Formula:</strong><br>
+σ<sub>fwd</sub> = √((σ₂²·T₂ − σ₁²·T₁) / (T₂ − T₁))<br>
+FF = (σ₁ − σ<sub>fwd</sub>) / σ<sub>fwd</sub></p>
+
+<fieldset>
+  <legend>Inputs</legend>
+  <div>
+    <label>DTE₁ (days)</label><input id="dte1" type="number" step="any">
+    <label>IV₁ (%)</label><input id="iv1" type="number" step="any">
   </div>
+  <div>
+    <label>DTE₂ (days)</label><input id="dte2" type="number" step="any">
+    <label>IV₂ (%)</label><input id="iv2" type="number" step="any">
+  </div>
+  <button onclick="compute()">Compute</button>
+  <button onclick="clearFields()">Clear</button>
+</fieldset>
 
-  <script>
-    async function getData() {
-      const ticker = document.getElementById('ticker').value.trim().toUpperCase();
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = "Loading...";
+<fieldset class="outputs" id="outputs" style="display:none;"></fieldset>
 
-      if (!ticker) {
-        resultsDiv.innerHTML = '<p class="error">Please enter a ticker symbol.</p>';
-        return;
-      }
+<p class="note">
+Notes: Require DTE₂ > DTE₁ ≥ 0 and IVs ≥ 0.
+If forward variance is negative, the forward vol is not real (check inputs).
+If σ<sub>fwd</sub> = 0, FF is undefined.
+</p>
 
-      try {
-        const url = `https://financialmodelingprep.com/api/v3/quote/${ticker}?apikey=wmQHijCTjVI5vCdfmNHkrkaDypbeI3eO`;
-        const response = await fetch(url);
-        const data = await response.json();
+<script>
+function compute() {
+  const dte1 = parseFloat(document.getElementById('dte1').value);
+  const iv1 = parseFloat(document.getElementById('iv1').value);
+  const dte2 = parseFloat(document.getElementById('dte2').value);
+  const iv2 = parseFloat(document.getElementById('iv2').value);
+  const out = document.getElementById('outputs');
 
-        const result = data.quoteResponse.result[0];
-        if (!result) {
-          resultsDiv.innerHTML = '<p class="error">Ticker not found.</p>';
-          return;
-        }
+  // validate
+  if ([dte1, iv1, dte2, iv2].some(isNaN)) return alert("Please enter numeric values.");
+  if (dte1 < 0 || dte2 < 0) return alert("DTEs must be non-negative.");
+  if (dte2 <= dte1) return alert("Require DTE₂ > DTE₁.");
+  if (iv1 < 0 || iv2 < 0) return alert("IVs must be non-negative.");
 
-        const price = result.regularMarketPrice?.toFixed(2);
-        const change = result.regularMarketChangePercent?.toFixed(2);
-        const pe = result.trailingPE ? result.trailingPE.toFixed(2) : "N/A";
-        const cap = result.marketCap ? (result.marketCap / 1e9).toFixed(2) + "B" : "N/A";
+  const T1 = dte1 / 365, T2 = dte2 / 365;
+  const s1 = iv1 / 100, s2 = iv2 / 100;
+  const tv1 = s1**2 * T1, tv2 = s2**2 * T2;
+  const denom = T2 - T1;
+  const fwdVar = (tv2 - tv1) / denom;
 
-        resultsDiv.innerHTML = `
-          <p><strong>Symbol:</strong> ${result.symbol}</p>
-          <p><strong>Price:</strong> $${price}</p>
-          <p><strong>Change:</strong> ${change}%</p>
-          <p><strong>P/E Ratio:</strong> ${pe}</p>
-          <p><strong>Market Cap:</strong> ${cap}</p>
-        `;
-      } catch (error) {
-        resultsDiv.innerHTML = '<p class="error">Error fetching data. Try again later.</p>';
-        console.error(error);
-      }
-    }
-  </script>
-</body>
-</html>
+  let html = `
+    <p>T₁ = ${T1.toFixed(6)} yr &nbsp;&nbsp; σ₁ = ${s1.toFixed(6)}</p>
+    <p>T₂ = ${T2.toFixed(6)} yr &nbsp;&nbsp; σ₂ = ${s2.toFixed(6)}</p>
+    <p>Total variance₁
