@@ -54,10 +54,22 @@ function compute() {
   const out = document.getElementById('outputs');
 
   // validate
-  if ([dte1, iv1, dte2, iv2].some(isNaN)) return alert("Please enter numeric values.");
-  if (dte1 < 0 || dte2 < 0) return alert("DTEs must be non-negative.");
-  if (dte2 <= dte1) return alert("Require DTE₂ > DTE₁.");
-  if (iv1 < 0 || iv2 < 0) return alert("IVs must be non-negative.");
+  if ([dte1, iv1, dte2, iv2].some(isNaN)) {
+    alert("Please enter numeric values.");
+    return;
+  }
+  if (dte1 < 0 || dte2 < 0) {
+    alert("DTEs must be non-negative.");
+    return;
+  }
+  if (dte2 <= dte1) {
+    alert("Require DTE₂ > DTE₁.");
+    return;
+  }
+  if (iv1 < 0 || iv2 < 0) {
+    alert("IVs must be non-negative.");
+    return;
+  }
 
   const T1 = dte1 / 365, T2 = dte2 / 365;
   const s1 = iv1 / 100, s2 = iv2 / 100;
@@ -68,4 +80,42 @@ function compute() {
   let html = `
     <p>T₁ = ${T1.toFixed(6)} yr &nbsp;&nbsp; σ₁ = ${s1.toFixed(6)}</p>
     <p>T₂ = ${T2.toFixed(6)} yr &nbsp;&nbsp; σ₂ = ${s2.toFixed(6)}</p>
-    <p>Total variance₁
+  `;
+
+  if (fwdVar < 0) {
+    html += `<p class="error">Forward variance is negative (&lt; 0) — forward volatility is not real. Check inputs.</p>`;
+    out.style.display = 'block';
+    out.innerHTML = html;
+    return;
+  }
+
+  const sigmaFwd = Math.sqrt(fwdVar);
+  // Handle sigmaFwd == 0 for FF
+  let ffText = 'undefined';
+  if (sigmaFwd > 0) {
+    const ff = (s1 - sigmaFwd) / sigmaFwd;
+    ffText = ff.toFixed(6);
+  }
+
+  html += `
+    <p>Forward variance = ${fwdVar.toExponential(6)}</p>
+    <p>σ<sub>fwd</sub> = ${sigmaFwd.toFixed(6)}</p>
+    <p>FF = ${ffText}</p>
+  `;
+
+  out.style.display = 'block';
+  out.innerHTML = html;
+}
+
+function clearFields() {
+  document.getElementById('dte1').value = '';
+  document.getElementById('iv1').value = '';
+  document.getElementById('dte2').value = '';
+  document.getElementById('iv2').value = '';
+  const out = document.getElementById('outputs');
+  out.style.display = 'none';
+  out.innerHTML = '';
+}
+</script>
+</body>
+</html>
